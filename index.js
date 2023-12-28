@@ -6,23 +6,66 @@ const loginId = process.env.LOGIN_ID;
 const password = process.env.PASSWORD;
 const baseURL = process.env.BASE_URL;
 //----------------------------------Test data----------------------//
-const operation = "FETCH";
-const account = "Nua (Prepaid)";
-const timeFrame = "duration=2023-11-01_2023-11-15";
-const campaignName = "Auto - Brand - CC";
-
+// const operation = "FETCH";
+const account = "RelaxoNDM_PO";
+// const timeFrame = "duration=2023-11-01_2023-11-15";
+// const campaignName = "Auto - Brand - CC";
 
 //const reports = ["ba","pla","pca"];
 //----------------------------------Test data----------------------//
-(async () => {
-  const browser = await puppeteer.launch({ headless: "new" }); // Set headless to false for a visible browser
-  const page = await browser.newPage();
-  const newActions = await getNewActions();
-  if (newActions && newActions.data) {
-    // login in
-    await loginToFlipkartPortal(page);
 
-    // skip intro if there
+const PAUSE_ACTION = "Pause";
+const RESUME_ACTION = "Resume";
+const ABORT_ACTION = "Abort";
+const FETCH_LIVE_ACTION = "Fetch";
+const BUDGET_INCREASE = "Budget Increase";
+
+// (async () => {
+//   const browser = await puppeteer.launch({ headless: false }); // Set headless to false for a visible browser
+//   const page = await browser.newPage();
+//   const newActions = await getNewActions();
+//   if (newActions && newActions.data) {
+//     // login in
+//     await loginToFlipkartPortal(page);
+
+//     // skip intro if there
+//     await introSkip(page);
+
+//     let accountElement = await findAccount(page, account);
+
+//     if (accountElement.length > 0) {
+//       await accountElement[0].click();
+//       await sleep(3000);
+//     } else {
+//       console.error(`Span with text ${account} not found`);
+//     }
+
+//     if (operation == "FETCH") {
+//       // navigate to reports
+//       await navigateToCampaignMgr(page);
+//       //await collectReportsData(page);
+//       //await toggleLiveReportSwitch(page);
+//       //await pauseCampaign(page,campaignName);
+//     } else if (operation == "UPDATE") {
+//       await navigateToCampaignMgr(page);
+//       //await pullStats(page);
+//       //await updateCampaignBudget(page,campaignName);
+//     }
+//     // Close the browser
+//     console.log("Completed the task exiting now.");
+//   }
+//   // // await browser.close();
+// })();
+
+const performTasks = async (actions) => {
+  try {
+    const browser = await puppeteer.launch({ headless: false }); // Set headless to false for a visible browser
+    const page = await browser.newPage();
+    // Set the viewport to full screen
+    await page.setViewport({ width: 1920, height: 1080 }); 
+    //login
+    await loginToFlipkartPortal(page);
+    //skip intro
     await introSkip(page);
 
     let accountElement = await findAccount(page, account);
@@ -34,22 +77,61 @@ const campaignName = "Auto - Brand - CC";
       console.error(`Span with text ${account} not found`);
     }
 
-    if (operation == "FETCH") {
-      // navigate to reports
-      await navigateToCampaignMgr(page);
-      //await collectReportsData(page);
-      //await toggleLiveReportSwitch(page);
-      await pauseCampaign(page,campaignName);
-    } else if (operation == "UPDATE") {
-      await navigateToCampaignMgr(page);
-      //await pullStats(page);
-      //await updateCampaignBudget(page,campaignName);
+    for (let i = 0; i < actions.length; i++) {
+      if(actions[i].campaign_id == 'S5320YUUF5PZ'){
+      if (actions[i].action_name == PAUSE_ACTION) {
+        await navigateToCampaignMgr(page);
+        let res = await togglePauseOrResume(page, actions[i].campaign_id);
+        if (res) {
+          console.log("Campaign " + campaignName + " Successfully Paused");
+          let markTaskComplete = await markTheTaskAsComplete(
+            actions[i].campaign_id
+          );
+        }
+      } else if (actions[i].action_name == RESUME_ACTION) {
+        await navigateToCampaignMgr(page);
+        let res = await togglePauseOrResume(page, actions[i].campaign_id);
+        
+        if (res) {
+          console.log("Campaign " + campaignName + " Successfully Resumed");
+          let markTaskComplete = await markTheTaskAsComplete(
+            actions[i].campaign_id
+          );
+        }
+      } else if (actions[i].action_name == ABORT_ACTION) {
+        await navigateToCampaignMgr(page);
+        let res = await abortCampaign(page, actions[i].campaign_id);
+        if (res) {
+          let markTaskComplete = await markTheTaskAsComplete(
+            actions[i].campaign_id
+          );
+        }
+      } else if (actions[i].action_name == FETCH_LIVE_ACTION) {
+        await navigateToReports(page);
+        let res = await toggleLiveReportSwitch(page);
+        if(res){
+          let markTaskComplete = await markTheTaskAsComplete(actions.campaign_id)
+        }
+      }else if(actions[i].action_name == BUDGET_INCREASE){
+        await navigateToCampaignMgr(page);
+        let res = await updateCampaignBudget(page, actions[i].campaign_id , actions[i].campaign_budget);
+        if (res) {
+          let markTaskComplete = await markTheTaskAsComplete(
+            actions[i].campaign_id
+          );
+        }
+      }
     }
-    // Close the browser
+   }
     console.log("Completed the task exiting now.");
+    await browser.close();
+    return true;
+  } catch (error) {
+    return false; 
+  }finally{
+    await browser.close();
   }
-  // // await browser.close();
-})();
+};
 
 const loginToFlipkartPortal = async (page) => {
   try {
@@ -78,25 +160,21 @@ const loginToFlipkartPortal = async (page) => {
 
 const getNewActions = async () => {
   try {
-    // Make a new API call (replace the URL with your actual API endpoint)
-    //const response = await axios.get('https://example.com/api/actions');
+    // Replace the URL with your actual API endpoint
+    const apiUrl = process.env.CAMPAIGN_TASK_URL;
 
-    // Mocked response for now
-    const mockedResponse = {
-      data: {
-        action: {
-          campaignName: "Auto - Brand - CC",
-          name: "Budget Increase",
-          campaignBudget: 120,
-        },
-      },
-    };
+    // Make an API call
+    const response = await axios.get(apiUrl);
 
-    // Return the mocked response for testing purposes
-    return mockedResponse;
+    // Process the API response
+    const { data } = response;
+
+    // Perform operations on the data if needed
+    // For now, simply return the data as it is
+    return data;
   } catch (error) {
     // Handle errors if the API call fails
-    console.error("Error in API call:", error.message);
+    console.error("Error in API call:", error.response.data);
     throw error;
   }
 };
@@ -306,9 +384,9 @@ const pullStats = async (page) => {
   return true;
 };
 
-const updateCampaignBudget = async (page, campaignName) => {
+const updateCampaignBudget = async (page, campaignName, budget) => {
   await introSkip(page);
-  const jsonData = await page.evaluate(() => {
+  const jsonData = await page.evaluate((campaignName) => {
     const pfDataTable = document.querySelector("pf-data-table");
     const shadowRoot = pfDataTable.shadowRoot;
     // Select the table element inside the shadow DOM
@@ -347,13 +425,13 @@ const updateCampaignBudget = async (page, campaignName) => {
                 // If no <a> element found, use the text from the <div> element
                 cellText = divSlotElement.textContent.trim();
               }
-              if (cellText.includes("Auto - Brand - CC")) {
+              console.log("Test"+cellText);
+              if (cellText.includes(campaignName)) {
                 found = true;
                 let budgetSlotName = slotName.split("-")[0] + "-" + 3;
                 const divSlotElement = pfDataTable.querySelector(
                   `div[slot="${budgetSlotName}"]`
                 );
-                console.log(divSlotElement);
                 let editButton = divSlotElement.querySelector(
                   ".styles__EditIcon-sc-13tmvzh-13"
                 );
@@ -364,6 +442,7 @@ const updateCampaignBudget = async (page, campaignName) => {
                 });
                 editButton.dispatchEvent(clickEvent);
                 console.log("Clicked on budget edit icon");
+                debugger;
                 // Click on the identified element
                 return;
               }
@@ -372,7 +451,7 @@ const updateCampaignBudget = async (page, campaignName) => {
         }
       });
     });
-  });
+  },campaignName);
   // Wait for the popover to appear
   await page.waitForSelector("#popover-content");
 
@@ -389,7 +468,7 @@ const updateCampaignBudget = async (page, campaignName) => {
 
   await sleep(5000);
   // Input value in the text box
-  await page.type('#popover-content input[type="number"]', "100");
+  await page.type('#popover-content input[type="number"]', budget);
   console.log("Entered Budget Increase value 100");
   await sleep(5000);
   await page.evaluate(() => {
@@ -400,10 +479,11 @@ const updateCampaignBudget = async (page, campaignName) => {
   });
 
   console.log("Updated campaign budget");
-  return;
+  return true;
 };
 
 const findAccount = async (page, account) => {
+  await introSkip(page);
   // Click on the div with class 'styles__StyledRightContainer-sc-15k3kqb-0'
   await page.waitForSelector("div.styles__StyledRightContainer-sc-15k3kqb-0", {
     timeout: 60000,
@@ -447,9 +527,11 @@ const toggleLiveReportSwitch = async (page) => {
   }
 };
 
-const pauseCampaign = async (page, campaignName) => {
+const togglePauseOrResume = async (page, campaignName) => {
+  try{
   await introSkip(page);
   const jsonData = await page.evaluate((campaignName) => {
+    console.log(campaignName);
     const pfDataTable = document.querySelector("pf-data-table");
     const shadowRoot = pfDataTable.shadowRoot;
     // Select the table element inside the shadow DOM
@@ -489,7 +571,6 @@ const pauseCampaign = async (page, campaignName) => {
                 cellText = divSlotElement.textContent.trim();
               }
               if (cellText.includes(campaignName)) {
-                console.log(cellText);
                 found = true;
                 let budgetSlotName = slotName.split("-")[0] + "-" + 13;
                 const divSlotElement = pfDataTable.querySelector(
@@ -513,11 +594,11 @@ const pauseCampaign = async (page, campaignName) => {
         }
       });
     });
-  },campaignName);
+  }, campaignName);
 
-  await page.waitForSelector('.styles__DialogContent-aogigs-2');
+  await page.waitForSelector(".styles__DialogContent-aogigs-2");
   console.log("Found the confirmation Dialog ");
-  const buttons = await page.$$('.styles__DialogContent-aogigs-2 button');
+  const buttons = await page.$$(".styles__DialogContent-aogigs-2 button");
   // Check if the second button exists
   if (buttons.length >= 2) {
     // Click on the second button
@@ -527,9 +608,15 @@ const pauseCampaign = async (page, campaignName) => {
   } else {
     console.error("Second button not found");
   }
+  return true;
+}catch(error){
+  console.log("Campaign "+campaignName+" not found");
+  return false;
+}
 };
 
 const abortCampaign = async (page, campaignName) => {
+  try{
   await introSkip(page);
   const jsonData = await page.evaluate((campaignName) => {
     const pfDataTable = document.querySelector("pf-data-table");
@@ -595,11 +682,11 @@ const abortCampaign = async (page, campaignName) => {
         }
       });
     });
-  },campaignName);
+  }, campaignName);
 
-  await page.waitForSelector('.styles__DialogContent-aogigs-2');
+  await page.waitForSelector(".styles__DialogContent-aogigs-2");
   console.log("Found the confirmation Dialog ");
-  const buttons = await page.$$('.styles__DialogContent-aogigs-2 button');
+  const buttons = await page.$$(".styles__DialogContent-aogigs-2 button");
   // Check if the second button exists
   if (buttons.length >= 2) {
     // Click on the second button
@@ -609,4 +696,58 @@ const abortCampaign = async (page, campaignName) => {
   } else {
     console.error("Abort confirmation button button not found");
   }
+
+  return true;
+}catch(error){
+  console.log("Campaign "+campaignName+" not found");
+  return false;
+}
 };
+
+// Function to continuously fetch new actions at a specified interval
+const fetchNewActionsPeriodically = async (intervalInSeconds) => {
+  try {
+    while (true) {
+      const newActions = await getNewActions();
+      console.log("New Actions:", newActions);
+      if (newActions.campaigns && newActions.campaigns.length) {
+        await performTasks(newActions.campaigns);
+      }
+      // Sleep for the specified interval before making the next call
+      await new Promise((resolve) =>
+        setTimeout(resolve, intervalInSeconds * 1000)
+      );
+    }
+  } catch (error) {
+    // Handle errors if needed
+    console.error("Error:", error.message);
+  }
+};
+
+const markTheTaskAsComplete = async (campaignId) => {
+  try {
+    // Replace the URL with your actual API endpoint
+    const apiUrl = `${process.env.CAMPAIGN_TASK_COMPLETE_URL}/${campaignId}`;
+
+    // Make a POST API call
+    const response = await axios.post(apiUrl);
+
+    // Process the API response
+    const { data } = response;
+
+    // Check if the response indicates success
+    if (data.message === "Campaign execution marked successfully") {
+      console.log(`Campaign ${campaignId} marked as complete successfully.`);
+      return data;
+    } else {
+      console.error("Campaign execution was not successful:", data.message);
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    // Handle errors if the API call fails
+    console.error("Error in API call:", error.message);
+    throw error;
+  }
+};
+
+fetchNewActionsPeriodically(60);
