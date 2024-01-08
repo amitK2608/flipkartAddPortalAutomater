@@ -425,7 +425,6 @@ const updateCampaignBudget = async (page, campaignName, budget) => {
                 // If no <a> element found, use the text from the <div> element
                 cellText = divSlotElement.textContent.trim();
               }
-              console.log("Test"+cellText);
               if (cellText.includes(campaignName)) {
                 found = true;
                 let budgetSlotName = slotName.split("-")[0] + "-" + 3;
