@@ -78,7 +78,6 @@ const performTasks = async (actions) => {
     }
 
     for (let i = 0; i < actions.length; i++) {
-      if(actions[i].campaign_id == 'S5320YUUF5PZ'){
       if (actions[i].action_name == PAUSE_ACTION) {
         await navigateToCampaignMgr(page);
         let res = await togglePauseOrResume(page, actions[i].campaign_id);
@@ -121,8 +120,9 @@ const performTasks = async (actions) => {
           );
         }
       }
-    }
    }
+    await navigateToCampaignMgr(page);  
+    await collectReportsData(page);
     console.log("Completed the task exiting now.");
     await browser.close();
     return true;
@@ -442,7 +442,6 @@ const updateCampaignBudget = async (page, campaignName, budget) => {
                 });
                 editButton.dispatchEvent(clickEvent);
                 console.log("Clicked on budget edit icon");
-                debugger;
                 // Click on the identified element
                 return;
               }
@@ -579,7 +578,6 @@ const togglePauseOrResume = async (page, campaignName) => {
                 let pauseButton = divSlotElement.querySelector(
                   ".styles__FlexBox-rxxhl-3 span:nth-child(3) div"
                 );
-                console.log(pauseButton);
                 var clickEvent = new Event("click", {
                   bubbles: true,
                   cancelable: false,
